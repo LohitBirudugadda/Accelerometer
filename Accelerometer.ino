@@ -1,6 +1,7 @@
 #include "Wire.h"
 #include "FastIMU.h"
 #include "Nokia_5110.h"
+#include <math.h>
 
 #define RST 4
 #define CE 5
@@ -11,73 +12,74 @@
 MPU6050 IMU;
 Nokia_5110 lcd = Nokia_5110(RST, CE, DC, DIN, CLK);
 
-
 AccelData Accel;
 GyroData Gyro;
-
-calData calibration = { 0 };
+calData calibration = {0};
 
 const int SDA1 = 21;
 const int SCL1 = 22;
 
-void getAccelData(){
-    
-    lcd.print("AccelX: ");
-    lcd.println(Accel.accelX);
-    lcd.print("AccelY: ");
-    lcd.println(Accel.accelY);
-    lcd.print("AccelZ: ");
-    lcd.println(Accel.accelZ);
-}
 
-void getGyroData(){
+void displayTotals() {
+    // Calculate total G-force
+    float gForce = sqrt(
+        Accel.accelX * Accel.accelX +
+        Accel.accelY * Accel.accelY +
+        Accel.accelZ * Accel.accelZ
+    );
 
-    lcd.print("GyroX: ");
-    lcd.println(Gyro.gyroX);
-    lcd.print("GyroY: ");
-    lcd.println(Gyro.gyroY);
-    lcd.print("GyroZ: ");
-    lcd.println(Gyro.gyroZ);
+    // Calculate total gyro magnitude
+    float gyroMag = sqrt(
+        Gyro.gyroX * Gyro.gyroX +
+        Gyro.gyroY * Gyro.gyroY +
+        Gyro.gyroZ * Gyro.gyroZ
+    );
+
+    lcd.clear();
+
+    // Row 0: G-Force
+    lcd.setCursor(0,0);
+    lcd.print("G-Force: ");
+    lcd.print(gForce, 2);
+
+    // Row 1: Gyro
+    lcd.setCursor(0,1);
+    lcd.print("Gyro: ");
+    lcd.print(gyroMag, 2);
 }
 
 void setup() {
-
     Serial.begin(115200);
     Wire.begin(SDA1, SCL1);
 
     int err = IMU.init(calibration, 0x68);
-
     if (err != 0) {
-    lcd.print("IMU init error: ");
-    lcd.print(err);
-    delay(1000);
-    lcd.clear();
-    while (1);
+        lcd.print("IMU init error: ");
+        lcd.print(err);
+        delay(1000);
+        lcd.clear();
+        while (1);
     }
 
-    lcd.print("IMU\nIinitialized\nsuccessfully");
+    int rangeErr = IMU.setAccelRange(4);
+    if (rangeErr != 0) {
+            lcd.print("Range set error");
+            delay(1000);
+            lcd.clear();
+    }
+
+    lcd.print("IMU Initialized");
     delay(1000);
     lcd.clear();
-
 }
 
 void loop() {
-
+    int rangeErr = IMU.setAccelRange(4);
+    Serial.print(rangeErr);
     IMU.update();
-    lcd.clear();
-    lcd.print("Updating...");
-    delay(3000);
-    lcd.clear();
-
-
     IMU.getAccel(&Accel);
     IMU.getGyro(&Gyro);
 
-    getAccelData();
-    delay(2500);
-    lcd.clear();
-    getGyroData();
-    delay(2500);
-    lcd.clear();
-
+    displayTotals();
+    delay(500); // update twice per second
 }
